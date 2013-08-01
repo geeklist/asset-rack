@@ -28,7 +28,7 @@ class exports.Asset extends EventEmitter
         # Set the url
         @url = options.url if options.url?
 
-        # Set the cotents if given
+        # Set the contents if given
         @contents = options.contents if options.contents?
 
         # Set headers if given
@@ -51,7 +51,7 @@ class exports.Asset extends EventEmitter
         @mimetype ?= 'text/plain'
 
         # Whether to gzip the asset or not
-        @gzip = options.gzip
+        @gzip = options.gzip if @ext in ['.js', '.css', '.txt', '.html', '.xml']
 
         # Whether to hash the url or not or both
         @hash = options.hash if options.hash?
@@ -85,7 +85,7 @@ class exports.Asset extends EventEmitter
                 @createHeaders()
 
 
-            # If it's a muti asset then make sure they are all completed
+            # If it's a multi asset then make sure they are all completed
             if @assets?
                 async.forEach @assets, (asset, done) ->
                     asset.on 'error', done
@@ -101,6 +101,7 @@ class exports.Asset extends EventEmitter
                 if @gzip
                     zlib.gzip @contents, (error, gzip) =>
                         @gzipContents = gzip
+                        @md5 = crypto.createHash('md5').update(gzip).digest 'hex'
                         @emit 'complete'
                 else
                     @emit 'complete'
@@ -175,7 +176,6 @@ class exports.Asset extends EventEmitter
         
     # Default create method, usually overwritten 
     create: (options) ->
-        
         # At the end of a create method you always call
         # the created event
         @emit 'created'
@@ -199,7 +199,11 @@ class exports.Asset extends EventEmitter
 
     # Creates and md5 hash of the url for caching
     createSpecificUrl: ->
-        @md5 = crypto.createHash('md5').update(@contents).digest 'hex'
+        if typeof @contents is 'string'
+            contents = new Buffer @contents
+        else
+            contents = @contents
+        @md5 = crypto.createHash('md5').update(contents).digest 'hex'
 
         # This is the no hash option
         if @hash is false

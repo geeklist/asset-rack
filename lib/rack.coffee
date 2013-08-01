@@ -4,9 +4,12 @@
 # Pull in our dependencies
 async = require 'async'
 pkgcloud = require 'pkgcloud'
+AWS = require 'aws-sdk'
 fs = require 'fs'
 jade = require 'jade'
 pathutil = require 'path'
+zlib = require 'zlib'
+crypto = require 'crypto'
 {BufferStream, extend} = require('./util')
 {EventEmitter} = require 'events'
 
@@ -136,7 +139,8 @@ class exports.Rack extends EventEmitter
     deploy: (options, next) ->
         options.keyId = options.accessKey
         options.key = options.secretKey
-        deploy = =>
+
+        deployPkgcloud = =>
             client = pkgcloud.storage.createClient options
             assets = @assets
             # Big time hack for rackspace, first asset doesn't upload, very strange.
@@ -170,9 +174,118 @@ class exports.Rack extends EventEmitter
                 if options.configFile?
                     @writeConfigFile options.configFile
                 next() if next?
+
+        deployAWS = =>
+            assets = @assets
+            verbose = options.verbose or false
+            @fetchAssetsListOnS3 options, (error, indexedAssetsList) =>
+                return next error if error?
+                async.forEachSeries assets, (asset, next) =>
+                    s3Asset = indexedAssetsList[asset.specificUrl]
+                    if s3Asset?
+                        s3md5 = s3Asset.ETag.slice(1, s3Asset.ETag.length-1) # remove quotes
+                        if asset.md5 is s3md5
+                            console.log "skipping #{asset.url}" if verbose
+                            next()
+                        else
+                            console.log "uploading modified #{asset.url}" if verbose
+                            @uploadAssetToS3 options, asset, (error) =>
+                                return next error if error?
+                                next()
+                    else
+                        return next() if asset.url is '/javascript/templates.js'
+                        console.log "uploading #{asset.url}" if verbose
+                        @uploadAssetToS3 options, asset, (error) =>
+                            return next error if error?
+                            next()
+                , (error) =>
+                    if error?
+                        return next error if next?
+                        throw error
+                    if options.configFile?
+                        @writeConfigFile options.configFile
+                    next() if next?
+
+        deploy = if options.aws then deployAWS else deployPkgcloud
+
         if @completed
             deploy()
         else @on 'complete', deploy
+
+    # Fetch a list of all assets currently on S3, using aws-sdk-js instead of pkgcloud
+    fetchAssetsListOnS3: (options, next) ->
+        clientOptions =
+            accessKeyId: options.accessKey
+            secretAccessKey: options.secretKey
+        assetOptions=
+            Bucket: options.container
+
+        client = new AWS.S3 clientOptions
+        assetsList = []
+
+        fetchAssetsList = (assetsOptions, next) =>
+            client.listObjects assetOptions, (error, data) =>
+                return next error if error?
+                assetsList = assetsList.concat data.Contents
+                if data.Contents.length is 1000 # S3 limit per list
+                    assetOptions.Marker = assetsList.pop().Key
+                    fetchAssetsList assetOptions, next
+                else
+                  next null, assetsList
+
+        fetchAssetsList assetOptions, =>
+            indexedAssetsList = {}
+            for asset in assetsList
+                indexedAssetsList["/#{asset.Key}"] = asset
+            next null, indexedAssetsList
+
+    # Check if asset is on S3, using aws-sdk-js instead of pkgcloud
+    checkAssetOnS3: (options, asset, next) ->
+        clientOptions =
+            accessKeyId: options.accessKey
+            secretAccessKey: options.secretKey
+        assetOptions=
+            Bucket: options.container
+            Key: asset.specificUrl.slice(1) # remove the first slash
+        client = new AWS.S3 clientOptions
+        client.headObject assetOptions, (error, data) =>
+            if error?
+                if error.statusCode is 404 # asset not found
+                    next null, false
+                else
+                    next error
+            else
+                md5 = data.ETag.slice(1, data.ETag.length-1) # remove quotes
+                if asset.md5 isnt md5
+                    next null, false
+                else
+                    next null, true
+
+    # Upload asset to S3, using aws-sdk-js instead of pkgcloud
+    uploadAssetToS3: (options, asset, next) ->
+        verbose = options.verbose or false
+        clientOptions =
+            accessKeyId: options.accessKey
+            secretAccessKey: options.secretKey
+        assetOptions =
+            Bucket: options.container
+            Key: asset.specificUrl.slice(1) # remove the first slash
+            ContentType: asset.headers['content-type']
+            CacheControl: asset.headers['cache-control']
+        if asset.gzip
+            assetOptions.ContentEncoding = 'gzip'
+            assetOptions.Body = asset.gzipContents
+        else
+            assetOptions.Body = asset.contents
+        client = new AWS.S3 clientOptions
+        client.putObject assetOptions, (error, data) =>
+            return next error if error?
+            md5 = data.ETag.slice(1, data.ETag.length-1) # remove quotes
+            if asset.md5 isnt md5
+                if verbose
+                    console.log "MD5 mismatch after upload of #{asset.specificUrl}. Retrying..."
+                @uploadAssetToS3(options, asset, next)
+            next null
 
     # Creates an HTML tag for a given asset
     tag: (url) ->

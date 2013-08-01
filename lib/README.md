@@ -126,7 +126,7 @@ __Important__: You have to call `app.use(assets)` before `app.use(app.router)` o
 
 ### Deploying
 
-#### Amazon S3
+#### Amazon S3 (with pkgcloud)
 
 ```js
 assets.deploy({
@@ -134,6 +134,22 @@ assets.deploy({
     container: 'some-bucket',
     accessKey: 'aws-access-key',
     secretKey: 'aws-secret-key',
+}, function(error) {})
+```
+
+#### Amazon S3 (with aws-sdk)
+Since `pkgcloud` seems to have some issues with S3 (see #66) this alternative uses `aws-sdk`.  
+This method also only uploads changed files to S3 and has a `verbose` option.  
+You can also pass the `gzip` option to `StaticAssets` with this method, and it will compress `*.js`, `*.css`, `*.txt`, `*.html` and `*.xml` files.
+
+```js
+assets.deploy({
+    provider: 'amazon',
+    container: 'some-bucket',
+    accessKey: 'aws-access-key',
+    secretKey: 'aws-secret-key',
+    aws: true,
+    verbose: false
 }, function(error) {})
 ```
 

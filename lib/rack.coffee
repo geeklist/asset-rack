@@ -193,7 +193,6 @@ class exports.Rack extends EventEmitter
                                 return next error if error?
                                 next()
                     else
-                        return next() if asset.url is '/javascript/templates.js'
                         console.log "uploading #{asset.url}" if verbose
                         @uploadAssetToS3 options, asset, (error) =>
                             return next error if error?

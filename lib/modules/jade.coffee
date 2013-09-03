@@ -9,13 +9,16 @@ class exports.JadeAsset extends Asset
     mimetype: 'text/javascript'
 
     create: (options) ->
-        @dirname = pathutil.resolve options.dirname
+        if options.dirname instanceof Array
+            @dirnames = options.dirname.map (dirname) -> pathutil.resolve dirname
+        else
+            @dirnames = [pathutil.resolve options.dirname]
         @separator = options.separator or '/'
         @compress = options.compress or false
-        @toWatch = @dirname
         @clientVariable = options.clientVariable or 'Templates'
         @beforeCompile = options.beforeCompile or null
-        @fileObjects = @getFileobjects @dirname
+        @base = pathutil.resolve options.base or null
+        @fileObjects = @getFileObjects @dirnames
         if @rack?
             assets = {}
             for asset in @rack.assets
@@ -40,7 +43,6 @@ class exports.JadeAsset extends Asset
             if @fileContents.length > 0
                 @fileContents += ","
             @fileContents += "'#{fileObject.funcName}': #{fileObject.compiled}"
-            
         @contents += @fileContents
         @contents += '};'
         @contents += '})();' if @assetsMap?
@@ -48,33 +50,39 @@ class exports.JadeAsset extends Asset
         unless @hasError
             @emit 'created'
         
-    getFileobjects: (dirname, prefix='') ->
-        filenames = fs.readdirSync dirname
+    getFileObjects: (dirnames, prefix='') ->
+        self = this
         paths = []
-        for filename in filenames
-            continue if filename.slice(0, 1) is '.'
-            path = pathutil.join dirname, filename
-            stats = fs.statSync path
-            if stats.isDirectory()
-                newPrefix = "#{prefix}#{pathutil.basename(path)}#{@separator}"
-                paths = paths.concat @getFileobjects path, newPrefix
-            else
-                continue if filename.indexOf('.jade') is -1
-                funcName = "#{prefix}#{pathutil.basename(path, '.jade')}"
-                fileContents = fs.readFileSync path, 'utf8'
-                fileContents = @beforeCompile fileContents if @beforeCompile?
-                try
-                    compiled = jade.compile fileContents,
-                        client: true,
-                        compileDebug: false,
-                        filename: path
-                    paths.push
-                        path: path
-                        funcName: funcName
-                        compiled: compiled
-                catch error
-                    @hasError = true
-                    @emit 'error', error
+        async.each dirnames, ((dirname, cb) ->
+            if self.base && prefix is ''
+                prefix = (dirname.replace self.base + '/', '') + '/'
+            filenames = fs.readdirSync dirname
+            for filename in filenames
+                continue if filename.slice(0, 1) is '.'
+                path = pathutil.join dirname, filename
+                stats = fs.statSync path
+                if stats.isDirectory()
+                    newPrefix = "#{prefix}#{pathutil.basename(path)}#{self.separator}"
+                    paths = paths.concat self.getFileObjects [path], newPrefix
+                else
+                    continue if pathutil.extname(path) isnt '.jade'
+                    funcName = "#{prefix}#{pathutil.basename(path, '.jade')}"
+                    fileContents = fs.readFileSync path, 'utf8'
+                    fileContents = self.beforeCompile fileContents if self.beforeCompile?
+                    try
+                        compiled = jade.compile fileContents,
+                            client: true,
+                            compileDebug: false,
+                            filename: path
+                        paths.push
+                            path: path
+                            funcName: funcName
+                            compiled: compiled
+                    catch error
+                        @hasError = true
+                        @emit 'error', error
+            prefix = ''
+            cb paths
+        ), (paths) ->
+            paths = paths.concat paths
         paths
-
-

@@ -5,6 +5,11 @@ async = require 'async'
 jade = require 'jade'
 Asset = require('../index').Asset
 
+Array::unique = ->
+  output = {}
+  output[@[key]] = @[key] for key in [0...@length]
+  value for key, value of output
+
 class exports.JadeAsset extends Asset
     mimetype: 'text/javascript'
 
@@ -19,10 +24,12 @@ class exports.JadeAsset extends Asset
         @beforeCompile = options.beforeCompile or null
         @base = pathutil.resolve options.base or null
         @fileObjects = @getFileObjects @dirnames
+        @requiredAssets = @extractRequiredAssets()
+
         if @rack?
             assets = {}
             for asset in @rack.assets
-                assets[asset.url] = asset.specificUrl
+                assets[asset.url] = asset.specificUrl   if @requiredAssets.indexOf(asset.url) > -1
 
             @assetsMap = """
                 var assets = { 
@@ -31,6 +38,13 @@ class exports.JadeAsset extends Asset
                 };
             """
         @createContents()
+
+    extractRequiredAssets: ->
+        assetRegExp = new RegExp(/assets\.url\(["|']([a-zA-Z0-9_\-\/\.]+)["|']\)/gm)
+        requiredAssets = []
+        for fileObject in @fileObjects
+            requiredAssets.push result[1]  while result = assetRegExp.exec fileObject.compiled.toString()
+        return requiredAssets.unique()
 
     createContents: ->
         @contents = fs.readFileSync require.resolve('jade').replace 'index.js', 'runtime.js'

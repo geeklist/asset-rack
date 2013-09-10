@@ -9,7 +9,6 @@ uglify = require 'uglify-js'
 
 class StaticAsset extends Asset
     create: (options) ->
-        console.log(options)
         @filename = pathutil.resolve options.filename
         @mimetype ?= mime.types[pathutil.extname(@filename).slice 1] || 'text/plain'
 

@@ -272,7 +272,7 @@ class exports.Rack extends EventEmitter
             region: options.region
 
         client = pkgcloud.storage.createClient clientOptions
-        assetList = []
+        assetsList = []
 
         client.getFiles options.container, (error, assetList) =>
             return next error if error?

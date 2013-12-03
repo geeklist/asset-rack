@@ -186,13 +186,26 @@ class exports.Rack extends EventEmitter
           if RackspaceAsset?
             if asset.md5 is RackspaceAsset.etag
               console.log "skipping #{asset.url}" if verbose
-              next()
-            else
-              console.log "uploading modified #{asset.url}" if verbose
-              # uploading here
-              next()
+              return next()
+          stream = null
+          headers = {}
+          if asset.gzip
+            stream = new BufferStream asset.gzipContents
+            headers['content-encoding'] = 'gzip'
           else
-            console.log "uploading #{asset.url}" if verbose
+            stream = new BufferStream asset.contents
+          url = asset.specificUrl.slice 1, asset.specificUrl.length
+          for key, value of asset.headers
+            headers[key] = value
+          headers['x-amz-acl'] = 'public-read' if options.provider is 'amazon'
+          clientOptions =
+            container: options.container
+            remote: url
+            headers: headers
+            stream: stream
+          console.log "uploading #{asset.url}" if verbose
+          client.upload clientOptions, (error) ->
+            return next error if error?
             next()
         , (error) =>
           if error?

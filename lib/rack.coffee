@@ -164,7 +164,6 @@ class exports.Rack extends EventEmitter
                     remote: url
                     headers: headers
                     stream: stream
-                console.log "uploading #{asset.url}" if verbose
                 client.upload clientOptions, (error) ->
                     return next error if error?
                     next()

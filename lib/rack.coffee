@@ -290,11 +290,12 @@ class exports.Rack extends EventEmitter
 
     client.getFiles options.container, (error, assetList) =>
       return next error if error?
-      console.log assetList
-      for asset in assetsList
-        specificUrl = "/" + asset.name.replace("-" + asset.etag, "")
-        indexedAssetsList[specificUrl] = asset
-      next null, indexedAssetsList
+      async.forEachSeries assetsList, (asset, cb) => 
+        indexedAssetsList["/" + asset.name.replace("-" + asset.etag, "")] = asset
+        cb null
+      , (error) =>
+        console.log indexedAssetsList
+        next null, indexedAssetsList
 
   # Check if asset is on S3, using aws-sdk-js instead of pkgcloud
   checkAssetOnS3: (options, asset, next) ->

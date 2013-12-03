@@ -175,6 +175,32 @@ class exports.Rack extends EventEmitter
                     @writeConfigFile options.configFile
                 next() if next?
 
+        deployRackspace = =>
+            client = pkgcloud.storage.createClient options
+            assets = @assets
+            @fetchAssetsListOnRackspace options, (error, indexedAssetsList) =>
+                return next error if error?
+                async.forEachSeries assets, (asset, next) =>
+                    RackspaceAsset = indexedAssetsList[asset.specificUrl]
+                    if RackspaceAsset?
+                        if asset.md5 is RackspaceAsset.etag
+                            console.log "skipping #{asset.url}" if verbose
+                            next()
+                        else
+                            console.log "uploading modified #{asset.url}" if verbose
+                            # uploading here
+                            next()
+                    else
+                        console.log "uploading #{asset.url}" if verbose
+                        next()
+                , (error) =>
+                    if error?
+                        return next error if next?
+                        throw error
+                    if options.configFile?
+                        @writeConfigFile options.configFile
+                    next() if next?
+
         deployAWS = =>
             assets = @assets
             verbose = options.verbose or false
@@ -205,7 +231,7 @@ class exports.Rack extends EventEmitter
                         @writeConfigFile options.configFile
                     next() if next?
 
-        deploy = if options.aws then deployAWS else deployPkgcloud
+        deploy = if options.aws then deployAWS else if options.rackspace then deployRackspace else deployPkgcloud
 
         if @completed
             deploy()
@@ -236,6 +262,22 @@ class exports.Rack extends EventEmitter
             indexedAssetsList = {}
             for asset in assetsList
                 indexedAssetsList["/#{asset.Key}"] = asset
+            next null, indexedAssetsList
+
+    fetchAssetsListOnRackspace: (options, next) ->
+        clientOptions =
+            provider: "rackspace"
+            username: options.username
+            apiKey: options.apiKey
+            region: options.region
+
+        client = pkgcloud.storage.createClient clientOptions
+        assetList = []
+
+        client.getFiles options.container, (error, assetList) =>
+            return next error if error?
+            for asset in assetsList
+                indexedAssetsList["/#{asset.name}"] = asset
             next null, indexedAssetsList
 
     # Check if asset is on S3, using aws-sdk-js instead of pkgcloud

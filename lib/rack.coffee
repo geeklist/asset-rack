@@ -181,6 +181,7 @@ class exports.Rack extends EventEmitter
       verbose = options.verbose or false
       @fetchAssetsListOnRackspace options, (error, indexedAssetsList) =>
         return next error if error?
+        console.log indexedAssetsList
         async.forEachSeries assets, (asset, next) =>
           RackspaceAsset = indexedAssetsList[asset.specificUrl]
           console.log asset, RackspaceAsset

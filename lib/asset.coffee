@@ -215,7 +215,7 @@ class exports.Asset extends EventEmitter
 
         # Might need a hostname if not on same server
         if @hostname?
-            @specificUrl = "//#{@hostname}#{@specificUrl}"
+            @specificUrl = "https://#{@hostname}#{@specificUrl}"
 
 
     # For extending this class in javascript

@@ -164,6 +164,7 @@ class exports.Rack extends EventEmitter
                     remote: url
                     headers: headers
                     stream: stream
+                console.log "uploading #{asset.url}" if verbose
                 client.upload clientOptions, (error) ->
                     return next error if error?
                     next()
@@ -319,7 +320,7 @@ class ConfigRack
             if request.path is url or request.path is specificUrl
 
                 # Redirect to the CDN, the config does not have the files
-                return response.redirect "//#{@hostname}#{specificUrl}"
+                return response.redirect "https://#{@hostname}#{specificUrl}"
         next()
     
     # Simple function to get the tag for a url
@@ -327,13 +328,13 @@ class ConfigRack
         switch pathutil.extname(url)
             when '.js'
                 tag = "\n<script type=\"text/javascript\" "
-                return tag += "src=\"//#{@hostname}#{@assetMap[url]}\"></script>"
+                return tag += "src=\"https://#{@hostname}#{@assetMap[url]}\"></script>"
             when '.css'
-                return "\n<link rel=\"stylesheet\" href=\"//#{@hostname}#{@assetMap[url]}\">"
+                return "\n<link rel=\"stylesheet\" href=\"https://#{@hostname}#{@assetMap[url]}\">"
 
     # Get the hashed url for a given url
     url: (url) ->
-        return "//#{@hostname}#{@assetMap[url]}"
+        return "https://#{@hostname}#{@assetMap[url]}"
         
         
 # Shortcut function

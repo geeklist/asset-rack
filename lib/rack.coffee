@@ -181,10 +181,8 @@ class exports.Rack extends EventEmitter
       verbose = options.verbose or false
       @fetchAssetsListOnRackspace options, (error, indexedAssetsList) =>
         return next error if error?
-        console.log indexedAssetsList
         async.forEachSeries assets, (asset, next) =>
           RackspaceAsset = indexedAssetsList[asset.specificUrl]
-          console.log asset, RackspaceAsset
           if RackspaceAsset?
             if asset.md5 is RackspaceAsset.etag
               console.log "skipping #{asset.url}" if verbose
@@ -292,8 +290,10 @@ class exports.Rack extends EventEmitter
 
     client.getFiles options.container, (error, assetList) =>
       return next error if error?
+      console.log assetList
       for asset in assetsList
-        indexedAssetsList["/!{asset.name.replace('-' + asset.etag, '')}"] = asset
+        specificUrl = "/" + asset.name.replace("-" + asset.etag, "")
+        indexedAssetsList[specificUrl] = asset
       next null, indexedAssetsList
 
   # Check if asset is on S3, using aws-sdk-js instead of pkgcloud

@@ -273,10 +273,10 @@ class exports.Rack extends EventEmitter
 
         client = pkgcloud.storage.createClient clientOptions
         assetsList = []
+        indexedAssetsList = {}
 
         client.getFiles options.container, (error, assetList) =>
             return next error if error?
-            indexedAssetsList = {}
             for asset in assetsList
                 indexedAssetsList["/#{asset.name}"] = asset
             next null, indexedAssetsList

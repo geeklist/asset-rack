@@ -197,7 +197,6 @@ class exports.Rack extends EventEmitter
           url = asset.specificUrl.slice 1, asset.specificUrl.length
           for key, value of asset.headers
             headers[key] = value
-          headers['x-amz-acl'] = 'public-read' if options.provider is 'amazon'
           clientOptions =
             container: options.container
             remote: url
@@ -292,7 +291,7 @@ class exports.Rack extends EventEmitter
     client.getFiles options.container, (error, assetList) =>
       return next error if error?
       for asset in assetsList
-        indexedAssetsList["/#{asset.name}"] = asset
+        indexedAssetsList["/!{asset.name.replace('-' + asset.etag, '')}"] = asset
       next null, indexedAssetsList
 
   # Check if asset is on S3, using aws-sdk-js instead of pkgcloud

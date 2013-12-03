@@ -183,6 +183,7 @@ class exports.Rack extends EventEmitter
         return next error if error?
         async.forEachSeries assets, (asset, next) =>
           RackspaceAsset = indexedAssetsList[asset.specificUrl]
+          console.log asset, RackspaceAsset
           if RackspaceAsset?
             if asset.md5 is RackspaceAsset.etag
               console.log "skipping #{asset.url}" if verbose

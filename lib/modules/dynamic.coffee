@@ -8,6 +8,7 @@ mime = require 'mime'
 
 class exports.DynamicAssets extends Asset
     create: (options) ->
+        @ignore = options.ignore or []
         @dirname = pathutil.resolve options.dirname
         @toWatch = @dirname
         {@type, @urlPrefix, @options, @filter, @rewriteExt} = options
@@ -25,19 +26,20 @@ class exports.DynamicAssets extends Asset
           ignoreFolders: true
           filter: @filter
           , (file, done) =>
-            url = pathutil.dirname(file.relpath)
-            url = url.split pathutil.sep
-            url = [] if url[0] is '.'
-            if @rewriteExt?
-              url.push file.namenoext + @rewriteExt
-            else
-              url.push file.name
+            if file.ext not in @ignore and file.name not in @ignore
+                url = pathutil.dirname(file.relpath)
+                url = url.split pathutil.sep
+                url = [] if url[0] is '.'
+                if @rewriteExt?
+                  url.push file.namenoext + @rewriteExt
+                else
+                  url.push file.name
 
-            opts =
-                url: @urlPrefix + url.join '/'
-                filename: file.path
-            opts[k] = v for own k, v of @options
+                opts =
+                    url: @urlPrefix + url.join '/'
+                    filename: file.path
+                opts[k] = v for own k, v of @options
 
-            @addAsset new @type opts
+                @addAsset new @type opts
             done()
         , => @emit 'created'
